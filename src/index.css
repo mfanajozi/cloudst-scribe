@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-ink-900 antialiased dark:bg-ink-950 dark:text-slate-100;
+}
+
+/* Subtle brand-pattern backdrop for desktop screens */
+@media (min-width: 640px) {
+  .app-backdrop {
+    background-image: radial-gradient(
+      circle at 15% 20%,
+      rgba(212, 164, 66, 0.08) 0%,
+      transparent 45%
+    );
+  }
+  .dark .app-backdrop {
+    background-image: radial-gradient(
+      circle at 15% 20%,
+      rgba(212, 164, 66, 0.07) 0%,
+      transparent 45%
+    );
+  }
+}

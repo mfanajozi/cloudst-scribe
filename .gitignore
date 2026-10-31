@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+
+# Build output (Vercel builds this itself)
+dist
+dist-ssr
+*.local
+
+# Environment & deploy metadata
+.env
+.env.*
+.vercel
+
+# Planning / agent workspace — not part of the deployed app
+planning/
+.agents/
+skills-lock.json
+
+# Internal docs — README.md stays public, internal notes stay out of the repo
+about-the-tool.md
+project-code.md
+
+# Source assets — deployed copies live in public/
+assets/
+
+# Type-check & debug artifacts
+*.tsbuildinfo
+npm-debug.log*
+
+# OS cruft
+.DS_Store
+Thumbs.db
