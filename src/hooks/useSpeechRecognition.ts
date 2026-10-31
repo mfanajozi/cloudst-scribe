@@ -114,9 +114,23 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
 
     if (!SpeechRecognition) {
       setIsSupported(false);
-      setError(
-        'Your browser does not support the Web Speech API. Please use Google Chrome, Microsoft Edge or Brave.'
-      );
+      const ua = navigator.userAgent;
+      const isFirefox = /firefox|seamonkey\//i.test(ua);
+      const isIOS =
+        /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+      if (isFirefox) {
+        setError(
+          'Firefox doesn’t implement the Web Speech API, so dictation can’t run here (mic recording tests will pass — that’s a different, older API). Open Scribe in Chrome, Edge or Brave instead. On Android: copy this link into Chrome’s address bar.'
+        );
+      } else if (isIOS) {
+        setError(
+          'iOS devices (iPhone/iPad) don’t support the Web Speech API in any mobile browser. Use an Android phone with Chrome, or a desktop Chrome, Edge or Brave.'
+        );
+      } else {
+        setError(
+          'Your browser doesn’t support the Web Speech API. Please use Google Chrome, Microsoft Edge or Brave.'
+        );
+      }
       return;
     }
 
