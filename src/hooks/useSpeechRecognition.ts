@@ -164,27 +164,40 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
         }
       }
 
-      // Echo guard: Chrome occasionally re-delivers an identical final within
-      // milliseconds (sometimes at a shifted index). Drop it instead of
-      // double-printing the word.
-      const trimmedChunk = finalChunk.trim();
-      const now = Date.now();
-      if (
-        trimmedChunk &&
-        trimmedChunk === lastFinalRef.current.text &&
-        now - lastFinalRef.current.at < 400
-      ) {
-        finalChunk = '';
-      } else if (trimmedChunk) {
-        lastFinalRef.current = { text: trimmedChunk, at: now };
-      }
-
+      // Two-line echo defence:
+      // ① Superseded finals — Chrome sometimes finalizes a fragment early
+      //   ("let's"), keeps the same result alive, then re-fires it extended
+      //   ("let's do this") at a new index. Appending both prints the prefix
+      //   twice, so when the new final starts with the previous one, only the
+      //   delta is appended.
+      // ② Straight echoes — an identical final re-delivered within 400ms is
+      //   dropped outright.
       if (finalChunk) {
-        setTranscript((prev) => {
-          // Smart spacing between flushed phrases
-          const needsSpace = prev.length > 0 && !/\s$/.test(prev);
-          return prev + (needsSpace ? ' ' : '') + finalChunk.trim();
-        });
+        const fullText = finalChunk.trim();
+        const normPrev = lastFinalRef.current.text.toLowerCase();
+        const normFull = fullText.toLowerCase();
+
+        let chunkToAppend = fullText;
+        if (normPrev && normFull.startsWith(normPrev) && normFull.length > normPrev.length) {
+          chunkToAppend = fullText.slice(lastFinalRef.current.text.length).trim();
+        }
+
+        const now = Date.now();
+        if (normFull === normPrev && now - lastFinalRef.current.at < 400) {
+          chunkToAppend = '';
+        }
+        lastFinalRef.current = {
+          text: normFull === normPrev ? lastFinalRef.current.text : fullText,
+          at: now,
+        };
+
+        if (chunkToAppend) {
+          setTranscript((prev) => {
+            // Smart spacing between flushed phrases
+            const needsSpace = prev.length > 0 && !/\s$/.test(prev);
+            return prev + (needsSpace ? ' ' : '') + chunkToAppend;
+          });
+        }
       }
       setInterimTranscript(interimChunk);
     };
