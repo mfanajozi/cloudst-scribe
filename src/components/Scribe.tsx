@@ -12,6 +12,7 @@ export const Scribe: React.FC = () => {
     error,
     isSupported,
     micGranted,
+    micDeviceCount,
     startListening,
     stopListening,
     clearTranscript,
@@ -99,8 +100,16 @@ export const Scribe: React.FC = () => {
           />
 
           {error && (
-            <p className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+            <p className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3 text-sm leading-relaxed text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
               ⚠️ {error}
+            </p>
+          )}
+
+          {error && micDeviceCount !== null && (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-mono">browser diagnostics — mics visible: {micDeviceCount}</span>
+              {micDeviceCount === 0 &&
+                ' (0 = the OS is hiding the mic from the browser entirely, not a site-permission issue)'}
             </p>
           )}
 

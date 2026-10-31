@@ -54,6 +54,8 @@ interface UseSpeechRecognitionResult {
   isSupported: boolean;
   /** True once the user has granted mic access (requested proactively on load). */
   micGranted: boolean;
+  /** How many mic devices the browser can currently see (null = unknown). */
+  micDeviceCount: number | null;
   startListening: () => void;
   stopListening: () => void;
   clearTranscript: () => void;
@@ -65,7 +67,8 @@ const FRIENDLY_ERRORS: Record<string, string> = {
     'Microphone access is blocked for this site. To allow it: click the 🔒 (or ⓘ) icon in the address bar → Site settings → Microphone → Allow, then reload this page. Prefer the address-bar method over chrome://settings — it updates the exact permission this page holds.',
   'service-not-allowed':
     'Microphone access is blocked at the browser level. Open your browser settings (e.g. chrome://settings/content/microphone), make sure this site is not on the “Not allowed” list, set Microphone to “Ask before accessing” or “Allow”, then reload this page.',
-  'audio-capture': 'No microphone was found. Please connect a mic and try again.',
+  'audio-capture':
+    'Your browser can’t see any microphone on this device — this block sits at the OS/driver level, below the browser’s own site permissions. Fix it on the system side: ① confirm a mic or headset is connected and not muted at the system level; ② Windows: Settings → Privacy & security → Microphone → allow access for apps and for your browser; ③ macOS: System Settings → Privacy & Security → Microphone → enable Chrome/Edge; ④ Linux: if your browser is a Flatpak/Snap install, grant it microphone access via Flatseal (or Snap permissions), or install the official .deb/.rpm build; ⑤ test at mictests.com in this same browser — if it also finds no mic, the block is OS-level; ⑥ then fully close and reopen the browser and reload Scribe.',
   network: 'Network hiccup — the speech engine needs an internet connection. Retrying…',
 };
 
@@ -76,11 +79,26 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(true);
   const [micGranted, setMicGranted] = useState(false);
+  const [micDeviceCount, setMicDeviceCount] = useState<number | null>(null);
 
   const recognitionRef = useRef<ISpeechRecognitionLike | null>(null);
   // Ref mirrors `isListening` so the `onend` handler never reads stale state.
   const listeningRef = useRef(false);
   const shouldListenRef = useRef(false);
+
+  /** How many mic devices does the browser actually see right now? */
+  const refreshMicDevices = useCallback(() => {
+    try {
+      navigator.mediaDevices
+        ?.enumerateDevices()
+        .then((devices) =>
+          setMicDeviceCount(devices.filter((d) => d.kind === 'audioinput').length)
+        )
+        .catch(() => setMicDeviceCount(null));
+    } catch {
+      setMicDeviceCount(null);
+    }
+  }, []);
 
   useEffect(() => {
     const win = window as unknown as IWindow;
@@ -163,6 +181,12 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
 
     recognitionRef.current = recognition;
 
+    // Live diagnostics: track the mic devices the browser can see — count and
+    // refresh whenever the user plugs/unplugs hardware.
+    refreshMicDevices();
+    const mediaDevices = navigator.mediaDevices;
+    mediaDevices?.addEventListener?.('devicechange', refreshMicDevices);
+
     // Proactively request mic access on page load. Plain `recognition.start()`
     // would only trigger the permission prompt after the user taps Start —
     // asking up-front means the session is ready the moment they do.
@@ -174,6 +198,8 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
           // the track is only opened to surface the permission prompt.
           stream.getTracks().forEach((track) => track.stop());
           setMicGranted(true);
+          // Labels only become readable after permission — recount now.
+          refreshMicDevices();
         })
         .catch((e) => {
           // A remembered "Block" denies instantly without prompting — surface
@@ -193,6 +219,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
     }
 
     return () => {
+      mediaDevices?.removeEventListener?.('devicechange', refreshMicDevices);
       shouldListenRef.current = false;
       try {
         recognition.abort();
@@ -200,7 +227,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
         /* no-op */
       }
     };
-  }, []);
+  }, [refreshMicDevices]);
 
   const startListening = useCallback(async () => {
     setError(null);
@@ -268,6 +295,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
     error,
     isSupported,
     micGranted,
+    micDeviceCount,
     startListening,
     stopListening,
     clearTranscript,
