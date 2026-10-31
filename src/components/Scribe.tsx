@@ -96,7 +96,7 @@ export const Scribe: React.FC = () => {
                 : 'Speech recognition is not available in this browser.'
             }
             aria-label="Dictated text"
-            className="h-[52vh] w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-lg leading-relaxed text-ink-900 transition-all placeholder:text-slate-400 sm:h-80 dark:border-ink-800 dark:bg-ink-950/70 dark:placeholder:text-slate-500"
+            className="h-[52vh] w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-lg leading-relaxed text-black transition-all placeholder:text-slate-400 sm:h-80 dark:border-ink-800 dark:bg-ink-950/70 dark:text-white dark:placeholder:text-slate-500"
           />
 
           {error && (

@@ -85,6 +85,14 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
   // Ref mirrors `isListening` so the `onend` handler never reads stale state.
   const listeningRef = useRef(false);
   const shouldListenRef = useRef(false);
+  // Highest final-result index consumed in the current session. Chrome is
+  // known to re-fire `onresult` with an already-delivered final (a quirk that
+  // makes single words print twice) — anything at or below this watermark is
+  // a repeat and is ignored. Reset whenever a fresh session starts.
+  const finalWatermarkRef = useRef(-1);
+  // Last final chunk appended + when — second line of defence for echoes that
+  // arrive at a shifted index.
+  const lastFinalRef = useRef<{ text: string; at: number }>({ text: '', at: 0 });
 
   /** How many mic devices does the browser actually see right now? */
   const refreshMicDevices = useCallback(() => {
@@ -147,10 +155,28 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
         const result = event.results[i];
         const text = result[0]?.transcript ?? '';
         if (result.isFinal) {
-          finalChunk += text;
+          if (i > finalWatermarkRef.current) {
+            finalWatermarkRef.current = i;
+            finalChunk += text;
+          }
         } else {
           interimChunk += text;
         }
+      }
+
+      // Echo guard: Chrome occasionally re-delivers an identical final within
+      // milliseconds (sometimes at a shifted index). Drop it instead of
+      // double-printing the word.
+      const trimmedChunk = finalChunk.trim();
+      const now = Date.now();
+      if (
+        trimmedChunk &&
+        trimmedChunk === lastFinalRef.current.text &&
+        now - lastFinalRef.current.at < 400
+      ) {
+        finalChunk = '';
+      } else if (trimmedChunk) {
+        lastFinalRef.current = { text: trimmedChunk, at: now };
       }
 
       if (finalChunk) {
@@ -183,6 +209,9 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
       setInterimTranscript('');
       if (shouldListenRef.current && recognitionRef.current) {
         try {
+          // New session → Chrome resets its result indices, so our watermark
+          // must reset with them.
+          finalWatermarkRef.current = -1;
           recognitionRef.current.start();
           return;
         } catch {
@@ -272,6 +301,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionResult => {
     }
 
     try {
+      finalWatermarkRef.current = -1; // fresh session, fresh result indices
       recognitionRef.current.start();
       shouldListenRef.current = true;
       listeningRef.current = true;
